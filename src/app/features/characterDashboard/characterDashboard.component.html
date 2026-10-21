@@ -1,0 +1,327 @@
+<main class="main-content">
+  @if (!currentUser()) {
+    <section class="auth-panel" aria-labelledby="auth-heading">
+      <p class="eyebrow">Mythic Tracker</p>
+      <h1 id="auth-heading">{{ authMode() === 'login' ? 'Sign in to your account' : 'Create your account' }}</h1>
+      <p>Your characters are saved to your account and available when you sign in.</p>
+      <form class="auth-form" (submit)="submitAuth($event)">
+        <label class="field-label" for="account-email">Email</label>
+        <input
+          id="account-email"
+          class="text-input"
+          type="email"
+          autocomplete="email"
+          required
+          [value]="email()"
+          (input)="email.set($any($event.target).value)"
+        >
+        <label class="field-label" for="account-password">Password</label>
+        <input
+          id="account-password"
+          class="text-input"
+          type="password"
+          [attr.autocomplete]="authMode() === 'register' ? 'new-password' : 'current-password'"
+          minlength="12"
+          required
+          [value]="password()"
+          (input)="password.set($any($event.target).value)"
+        >
+        @if (authError()) {
+          <p class="error-message" role="alert">{{ authError() }}</p>
+        }
+        <button mat-stroked-button type="submit">
+          {{ authMode() === 'login' ? 'Sign in' : 'Create account' }}
+        </button>
+      </form>
+      <button
+        class="text-button"
+        type="button"
+        (click)="authMode.set(authMode() === 'login' ? 'register' : 'login'); authError.set(null)"
+      >
+        {{ authMode() === 'login' ? 'New here? Create an account' : 'Already have an account? Sign in' }}
+      </button>
+    </section>
+  } @else {
+  <button class="text-button page-back" type="button" (click)="back()">Back</button>
+  <div class="account-bar">
+    <span>Signed in as {{ currentUser()?.email }}</span>
+    <button class="text-button" type="button" (click)="logout()">Sign out</button>
+  </div>
+  @if (characterError()) {
+    <p class="error-message" role="alert">{{ characterError() }}</p>
+  }
+  @if (isLoadingCharacters()) {
+    <p role="status">Loading your saved characters…</p>
+  }
+  @if (characterStore.characters().length > 0) {
+    <section class="characters-section" aria-labelledby="characters-heading">
+      <h2 id="characters-heading">Your Characters</h2>
+      <div class="characters-grid">
+        @for (character of characterStore.characters(); track character.id) {
+          <article class="saved-character">
+            <h3>{{ character.name }}</h3>
+            <p>{{ character.race }} {{ character.class }} · {{ character.background }}</p>
+            <span>Level {{ character.level }} · {{ character.alignment }}</span>
+          </article>
+        }
+      </div>
+    </section>
+  }
+
+  @if (!isCreatingCharacter()) {
+    <section class="create-prompt" aria-labelledby="create-heading">
+      <p class="eyebrow">Your next adventure starts here</p>
+      <h1 id="create-heading">Create your character</h1>
+      <p>Build a hero one choice at a time. Your selections stay with you as you go.</p>
+      <button mat-stroked-button type="button" (click)="beginCharacterCreation()">
+        {{ characterStore.currentCharacter() ? 'Continue your draft' : 'Begin character creation' }}
+      </button>
+    </section>
+  }
+
+  @if (isCreatingCharacter()) {
+    <section class="creation-flow" aria-labelledby="flow-heading">
+      <header class="flow-header">
+        <div>
+          <p class="eyebrow">Character creation</p>
+          <h1 id="flow-heading">Shape your hero</h1>
+        </div>
+        <button class="text-button" type="button" (click)="cancelCreation()">Cancel</button>
+      </header>
+
+      <ol class="step-progress" aria-label="Character creation progress">
+        @for (step of steps; track step; let index = $index) {
+          <li [class.active]="currentStep() === index" [class.complete]="currentStep() > index">
+            <span class="step-number">{{ index + 1 }}</span>
+            <span class="step-label">{{ step }}</span>
+          </li>
+        }
+      </ol>
+
+      @if (characterStore.isLoading()) {
+        <div class="status-panel" role="status">Loading character options…</div>
+      } @else if (characterStore.error()) {
+        <div class="status-panel error-panel" role="alert">
+          <p>{{ characterStore.error() }}</p>
+          <button mat-stroked-button type="button" (click)="retryLoadData()">Try again</button>
+        </div>
+      } @else {
+        <div class="step-container">
+          <p class="step-count">Step {{ currentStep() + 1 }} of {{ steps.length }}</p>
+          <h2>{{ stepHeading() }}</h2>
+
+          @switch (currentStep()) {
+            @case (0) {
+              <div class="step-panel">
+                <label class="field-label" for="character-name">What is your character called?</label>
+                <input
+                  id="character-name"
+                  class="text-input"
+                  type="text"
+                  maxlength="60"
+                  autocomplete="off"
+                  placeholder="Enter a character name"
+                  [value]="characterStore.currentCharacter()?.name ?? ''"
+                  (input)="updateName($event)"
+                >
+                <p class="field-hint">You can change this later.</p>
+              </div>
+            }
+
+            @case (1) {
+              <div class="step-panel">
+                <p class="step-description">Choose your character’s race and discover their ancestry.</p>
+                <p class="selection-hint">Select a race to see its traits, abilities, and other details.</p>
+                <div class="options-grid">
+                  @for (option of characterStore.races(); track option.slug || option.name) {
+                    <button
+                      class="option-card"
+                      type="button"
+                      [class.selected]="characterStore.currentCharacter()?.race === option.name"
+                      [attr.aria-pressed]="characterStore.currentCharacter()?.race === option.name"
+                      (click)="selectRace(option)"
+                    >
+                      <span class="option-name">{{ option.name }}</span>
+                      @if (option.desc || option.description) {
+                        <span class="option-description">{{ option.desc || option.description }}</span>
+                      }
+                    </button>
+                  } @empty {
+                    <p class="empty-state">No races are available right now.</p>
+                  }
+                </div>
+                @if (selectedRace(); as race) {
+                  <section class="option-details" aria-live="polite" [attr.aria-label]="race.name + ' details'">
+                    <h3>{{ race.name }}</h3>
+                    @for (detail of getOptionDetails(race); track detail.label) {
+                      <div class="option-detail">
+                        <h4>{{ detail.label }}</h4>
+                        <p>{{ detail.value }}</p>
+                      </div>
+                    } @empty {
+                      <p class="empty-state">No additional details are available for this race.</p>
+                    }
+                  </section>
+                }
+              </div>
+            }
+
+            @case (2) {
+              <div class="step-panel">
+                <p class="step-description">Choose the training and abilities that define your class.</p>
+                <p class="selection-hint">Select a class to see its hit die, proficiencies, equipment, and features.</p>
+                <div class="options-grid">
+                  @for (option of characterStore.classes(); track option.slug || option.name) {
+                    <button
+                      class="option-card"
+                      type="button"
+                      [class.selected]="characterStore.currentCharacter()?.class === option.name"
+                      [attr.aria-pressed]="characterStore.currentCharacter()?.class === option.name"
+                      (click)="selectClass(option)"
+                    >
+                      <span class="option-name">{{ option.name }}</span>
+                      @if (option.desc || option.description) {
+                        <span class="option-description">{{ option.desc || option.description }}</span>
+                      }
+                    </button>
+                  } @empty {
+                    <p class="empty-state">No classes are available right now.</p>
+                  }
+                </div>
+                @if (selectedClass(); as classOption) {
+                  <section class="option-details" aria-live="polite" [attr.aria-label]="classOption.name + ' details'">
+                    <h3>{{ classOption.name }}</h3>
+                    @for (detail of getOptionDetails(classOption); track detail.label) {
+                      <div class="option-detail">
+                        <h4>{{ detail.label }}</h4>
+                        <p>{{ detail.value }}</p>
+                      </div>
+                    } @empty {
+                      <p class="empty-state">No additional details are available for this class.</p>
+                    }
+                  </section>
+                }
+              </div>
+            }
+
+            @case (3) {
+              <div class="step-panel">
+                <p class="step-description">Your background tells the story of the life you led before adventuring.</p>
+                <p class="selection-hint">Select a background to see its proficiencies, equipment, and feature.</p>
+                <div class="options-grid">
+                  @for (option of characterStore.backgrounds(); track option.slug || option.name) {
+                    <button
+                      class="option-card"
+                      type="button"
+                      [class.selected]="characterStore.currentCharacter()?.background === option.name"
+                      [attr.aria-pressed]="characterStore.currentCharacter()?.background === option.name"
+                      (click)="selectBackground(option)"
+                    >
+                      <span class="option-name">{{ option.name }}</span>
+                      @if (option.desc || option.description) {
+                        <span class="option-description">{{ option.desc || option.description }}</span>
+                      }
+                    </button>
+                  } @empty {
+                    <p class="empty-state">No backgrounds are available right now.</p>
+                  }
+                </div>
+                @if (selectedBackground(); as background) {
+                  <section class="option-details" aria-live="polite" [attr.aria-label]="background.name + ' details'">
+                    <h3>{{ background.name }}</h3>
+                    @for (detail of getOptionDetails(background); track detail.label) {
+                      <div class="option-detail">
+                        <h4>{{ detail.label }}</h4>
+                        <p>{{ detail.value }}</p>
+                      </div>
+                    } @empty {
+                      <p class="empty-state">No additional details are available for this background.</p>
+                    }
+                  </section>
+                }
+              </div>
+            }
+
+            @case (4) {
+              <div class="step-panel details-panel">
+                <div>
+                  <h3>Alignment</h3>
+                  <p class="step-description">A guide to your character’s principles and outlook.</p>
+                  <div class="alignment-grid">
+                    @for (alignment of alignments; track alignment) {
+                      <button
+                        class="choice-chip"
+                        type="button"
+                        [class.selected]="characterStore.currentCharacter()?.alignment === alignment"
+                        [attr.aria-pressed]="characterStore.currentCharacter()?.alignment === alignment"
+                        (click)="selectAlignment(alignment)"
+                      >{{ alignment }}</button>
+                    }
+                  </div>
+                </div>
+
+                <div>
+                  <h3>Ability scores</h3>
+                  <p class="step-description">Set a starting score for each ability (3–18).</p>
+                  <div class="ability-grid">
+                    @for (ability of abilityScores; track ability.key) {
+                      <label class="ability-field">
+                        <span>{{ ability.label }}</span>
+                        <input
+                          type="number"
+                          min="3"
+                          max="18"
+                          [value]="characterStore.currentCharacter()?.[ability.key] ?? 10"
+                          (input)="updateAbilityScore(ability.key, $event)"
+                        >
+                      </label>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+
+            @case (5) {
+              <div class="step-panel">
+                <p class="step-description">Review your character before adding them to your roster.</p>
+                @if (characterStore.currentCharacter(); as character) {
+                  <dl class="character-review">
+                    <div><dt>Name</dt><dd>{{ character.name }}</dd></div>
+                    <div><dt>Race</dt><dd>{{ character.race }}</dd></div>
+                    <div><dt>Class</dt><dd>{{ character.class }}</dd></div>
+                    <div><dt>Background</dt><dd>{{ character.background }}</dd></div>
+                    <div><dt>Alignment</dt><dd>{{ character.alignment }}</dd></div>
+                    <div><dt>Level</dt><dd>{{ character.level || 1 }}</dd></div>
+                  </dl>
+                  <div class="review-abilities">
+                    @for (ability of abilityScores; track ability.key) {
+                      <span>{{ ability.label }} <strong>{{ character[ability.key] ?? 10 }}</strong></span>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          }
+
+          <footer class="step-actions">
+            @if (currentStep() > 0) {
+              <button class="text-button" type="button" (click)="previousStep()">Back</button>
+            } @else {
+              <span></span>
+            }
+            @if (currentStep() < steps.length - 1) {
+              <button mat-stroked-button type="button" [disabled]="!canContinue()" (click)="nextStep()">
+                Continue
+              </button>
+            } @else {
+              <button mat-stroked-button type="button" [disabled]="!canContinue() || isSavingCharacter()" (click)="completeCreation()">
+                {{ isSavingCharacter() ? 'Saving…' : 'Add to my characters' }}
+              </button>
+            }
+          </footer>
+        </div>
+      }
+    </section>
+  }
+  }
+</main>

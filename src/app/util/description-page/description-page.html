@@ -1,0 +1,286 @@
+@if(classData(); as data) {
+  <div class="description-container">
+    <h2>{{ data.name }}</h2>
+
+    @if(data.desc) {
+      <div class="description-sections">
+        @if(data.desc && data.desc.trim().length > 0) {
+          <!-- Always try to parse for headers and tables -->
+          @for(section of parseDescriptionWithTables(data.desc); track section.title + $index) {
+            @if(section.title || section.content || section.tableHtml) {
+              <div class="section">
+                @if(section.title) {
+                  <h3>{{ section.title }}</h3>
+                }
+                @if(section.content) {
+                  <div class="section-content">
+                    {{ section.content }}
+                  </div>
+                }
+                @if(section.tableHtml) {
+                  <div class="section-table" [innerHTML]="section.tableHtml"></div>
+                }
+              </div>
+            }
+          }
+        } @else {
+          <!-- Empty description -->
+          <p class="description">No description available</p>
+        }
+      </div>
+    }
+
+    <!-- Hit Points Section -->
+    @if(data.hit_dice || data.hp_at_1st_level || data.hp_at_higher_levels) {
+      <div class="detail-section">
+        <h3>Hit Points</h3>
+        @if(data.hit_dice) {
+          <div class="subsection">
+            <strong>Hit Die:</strong>
+            <p>{{ data.hit_dice }}</p>
+          </div>
+        }
+        @if(data.hp_at_1st_level) {
+          <div class="subsection">
+            <strong>At 1st Level:</strong>
+            <p>{{ data.hp_at_1st_level }}</p>
+          </div>
+        }
+        @if(data.hp_at_higher_levels) {
+          <div class="subsection">
+            <strong>At Higher Levels:</strong>
+            <p>{{ data.hp_at_higher_levels }}</p>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Proficiencies Section -->
+    @if(data.prof_armor || data.prof_weapons || data.prof_tools || data.prof_saving_throws || data.prof_skills) {
+      <div class="detail-section">
+        <h3>Proficiencies</h3>
+
+        @if(data.prof_armor) {
+          <div class="subsection">
+            <strong>Armor:</strong>
+            <p>{{ data.prof_armor }}</p>
+          </div>
+        }
+
+        @if(data.prof_weapons) {
+          <div class="subsection">
+            <strong>Weapons:</strong>
+            <p>{{ data.prof_weapons }}</p>
+          </div>
+        }
+
+        @if(data.prof_tools) {
+          <div class="subsection">
+            <strong>Tools:</strong>
+            <p>{{ data.prof_tools }}</p>
+          </div>
+        }
+
+        @if(data.prof_saving_throws) {
+          <div class="subsection">
+            <strong>Saving Throws:</strong>
+            <p>{{ data.prof_saving_throws }}</p>
+          </div>
+        }
+
+        @if(data.prof_skills) {
+          <div class="subsection">
+            <strong>Skills:</strong>
+            <p>{{ data.prof_skills }}</p>
+          </div>
+        }
+      </div>
+    }
+
+    @if(data.saving_throws && data.saving_throws.length > 0) {
+      <div class="detail-section">
+        <h3>Saving Throws</h3>
+        <p>{{ data.saving_throws.join(', ') }}</p>
+      </div>
+    }
+
+    @if(data.skill_proficiencies && data.skill_proficiencies.length > 0) {
+      <div class="detail-section">
+        <h3>Skill Proficiencies</h3>
+        <ul>
+          @for(skill of data.skill_proficiencies; track skill) {
+            <li>{{ skill }}</li>
+          }
+        </ul>
+      </div>
+    }
+
+    @if(data.armor_proficiencies && data.armor_proficiencies.length > 0) {
+      <div class="detail-section">
+        <h3>Armor Proficiencies</h3>
+        <ul>
+          @for(armor of data.armor_proficiencies; track armor) {
+            <li>{{ armor }}</li>
+          }
+        </ul>
+      </div>
+    }
+
+    @if(data.weapon_proficiencies && data.weapon_proficiencies.length > 0) {
+      <div class="detail-section">
+        <h3>Weapon Proficiencies</h3>
+        <ul>
+          @for(weapon of data.weapon_proficiencies; track weapon) {
+            <li>{{ weapon }}</li>
+          }
+        </ul>
+      </div>
+    }
+
+    @if(data.equipment) {
+      <div class="detail-section">
+        <h3>Equipment</h3>
+        @if(isString(data.equipment)) {
+          <div class="equipment-content">
+            {{ data.equipment }}
+          </div>
+        } @else {
+          <ul>
+            @for(item of parseEquipment(getEquipmentAsString(data.equipment)); track item) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
+    @if(data.table && getTableData(data.table).length > 0) {
+      <div class="detail-section">
+        <h3>Class Table</h3>
+        <div class="table-wrapper">
+          @let tableRows = getTableData(data.table);
+          @let tableHeaders = getTableHeaders(tableRows);
+          @if(tableHeaders.length > 0) {
+            <table class="class-table">
+              <thead>
+                <tr>
+                  @for(header of tableHeaders; track header) {
+                    <th>{{ header }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for(row of tableRows; track $index) {
+                  <tr>
+                    @if(getType(row) === 'object' && !isArray(row)) {
+                      @for(key of tableHeaders; track key) {
+                        <td>{{ row[key] }}</td>
+                      }
+                    } @else if(isArray(row)) {
+                      @for(cell of row; track $index) {
+                        <td>{{ cell }}</td>
+                      }
+                    } @else {
+                      <td>{{ row }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </div>
+      </div>
+    }
+
+    @if(data.features && data.features.length > 0) {
+      <div class="detail-section">
+        <h3>Features</h3>
+        <div class="features-list">
+          @for(feature of data.features; track feature.name) {
+            <div class="feature">
+              <h4>{{ feature.name }} @if(feature.level) { (Level {{ feature.level }}) }</h4>
+              @if(feature.description) {
+                <p>{{ feature.description }}</p>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Archetypes / Subclasses Section -->
+    @if(data.archetypes && data.archetypes.length > 0) {
+      <div class="detail-section archetypes-section">
+        <h3>{{ data.subtypes_name || 'Archetypes' }}</h3>
+        <div class="archetypes-list">
+          @for(archetype of data.archetypes; track archetype.slug) {
+            <div class="archetype">
+              <h4>{{ archetype.name }}</h4>
+              @if(archetype.desc) {
+                <div class="archetype-description">
+                  @if(archetype.desc.includes('###') || archetype.desc.includes('##### ')) {
+                    @for(section of parseDescriptionSections(archetype.desc); track section.title) {
+                      <div class="archetype-section">
+                        <h5>{{ section.title }}</h5>
+                        <p>{{ section.content }}</p>
+                      </div>
+                    }
+                  } @else {
+                    <p>{{ archetype.desc }}</p>
+                  }
+                </div>
+              }
+              @if(archetype.document__title) {
+                <div class="archetype-source">
+                  <small>Source: {{ archetype.document__title }}</small>
+                  @if(archetype.document__url) {
+                    <a href="{{ archetype.document__url }}" target="_blank" rel="noopener noreferrer">View Source</a>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if(data.subclasses && data.subclasses.length > 0) {
+      <div class="detail-section">
+        <h3>Subclasses</h3>
+        <div class="subclasses-list">
+          @for(subclass of data.subclasses; track subclass.name) {
+            <div class="subclass">
+              <h4>{{ subclass.name }}</h4>
+              @if(subclass.description) {
+                <p>{{ subclass.description }}</p>
+              }
+              @if(subclass.features && subclass.features.length > 0) {
+                <div class="subclass-features">
+                  @for(feature of subclass.features; track feature.name) {
+                    <div class="feature">
+                      <h5>{{ feature.name }} @if(feature.level) { (Level {{ feature.level }}) }</h5>
+                      @if(feature.description) {
+                        <p>{{ feature.description }}</p>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if(data.spellcasting_ability) {
+      <div class="detail-section">
+        <h3>Spellcasting</h3>
+        <p>{{ data.spellcasting_ability }}</p>
+      </div>
+    }
+  </div>
+} @else {
+  <div class="no-data">
+    <p>No class selected or class data not found</p>
+  </div>
+}

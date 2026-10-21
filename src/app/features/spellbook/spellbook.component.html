@@ -1,0 +1,170 @@
+<main class="spellbook-page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Character tools</p>
+      <h1>Spellbook</h1>
+      <p class="page-intro">Track the spells each character knows and has prepared.</p>
+      <span class="content-source">Official SRD content only</span>
+    </div>
+  </header>
+
+  @if (characterStore.characters().length === 0) {
+    <section class="empty-panel">
+      <h2>Create a character to get started</h2>
+      <p>Your spellbook is organized by character. Create one first, then add spells they know and prepare.</p>
+      <a class="primary-link" routerLink="/characters">Go to characters</a>
+    </section>
+  } @else {
+    <section class="spellbook-content">
+      @if (persistenceError()) {
+        <p class="error-message" role="alert">{{ persistenceError() }}</p>
+      }
+      <div class="book-summary">
+        <label class="character-select">
+          <span>Character</span>
+          <select [value]="selectedCharacterId() ?? characterStore.characters()[0].id" (change)="selectCharacter($event)">
+            @for (character of characterStore.characters(); track character.id) {
+              <option [value]="character.id">{{ character.name }} · {{ character.class }}</option>
+            }
+          </select>
+        </label>
+        @if (selectedCharacter(); as character) {
+          <div class="spell-counts" aria-live="polite">
+            <span><strong>{{ knownCount() }}</strong> known</span>
+            <span><strong>{{ preparedCount() }}</strong> prepared</span>
+            <span>Level {{ character.level }} {{ character.class }}</span>
+            <span>{{ availableSpells().length }} spells available</span>
+          </div>
+        }
+      </div>
+
+      <div class="spell-tabs" role="tablist" aria-label="Spell lists">
+        <button
+          id="available-tab"
+          class="spell-tab"
+          type="button"
+          role="tab"
+          [class.active]="activeTab() === 'available'"
+          [attr.aria-selected]="activeTab() === 'available'"
+          aria-controls="spell-results"
+          (click)="selectTab('available')"
+        >{{ availableLabel() }} <span>{{ availableCount() }}</span></button>
+        <button
+          id="known-tab"
+          class="spell-tab"
+          type="button"
+          role="tab"
+          [class.active]="activeTab() === 'known'"
+          [attr.aria-selected]="activeTab() === 'known'"
+          aria-controls="spell-results"
+          (click)="selectTab('known')"
+        >Known <span>{{ knownCount() }}</span></button>
+        <button
+          id="prepared-tab"
+          class="spell-tab"
+          type="button"
+          role="tab"
+          [class.active]="activeTab() === 'prepared'"
+          [attr.aria-selected]="activeTab() === 'prepared'"
+          aria-controls="spell-results"
+          (click)="selectTab('prepared')"
+        >Prepared <span>{{ preparedCount() }}</span></button>
+      </div>
+
+      <div class="spell-toolbar">
+        <label class="search-field">
+          <span class="visually-hidden">Search spells</span>
+          <input type="search" placeholder="Search spells by name, school, or description" (input)="updateSearch($event)">
+        </label>
+        <label class="level-filter">
+          <span class="visually-hidden">Filter by spell level</span>
+          <select [value]="selectedLevel()" (change)="updateLevel($event)">
+            <option value="all">All levels</option>
+            <option value="0">Cantrips</option>
+            @for (level of [1, 2, 3, 4, 5, 6, 7, 8, 9]; track level) {
+              <option [value]="level">Level {{ level }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      @if (characterStore.spellsLoading()) {
+        <div class="status-panel" role="status">Loading spells…</div>
+      } @else if (characterStore.spellsError()) {
+        <div class="status-panel error-panel" role="alert">
+          <p>{{ characterStore.spellsError() }}</p>
+          <button type="button" (click)="characterStore.loadSpells()">Try again</button>
+        </div>
+      } @else if (characterStore.spells().length === 0) {
+        <div class="status-panel">No spells are available from the spell source.</div>
+      } @else if (filteredSpells().length === 0) {
+        <div class="status-panel" id="spell-results" role="tabpanel" [attr.aria-labelledby]="activeTab() + '-tab'">
+          @if (searchTerm() || selectedLevel() !== 'all') {
+            <p>No spells match your {{ selectedLevel() === 'all' ? '' : 'level ' + selectedLevel() + ' and ' }}search filters.</p>
+          } @else if (activeTab() === 'available') {
+            <p>All available spells are known.</p>
+          } @else if (activeTab() === 'known') {
+            <p>No spells are marked as known yet. Choose a spell and mark it known.</p>
+          } @else {
+            <p>No known spells are prepared yet. Mark known spells as prepared from the Known tab.</p>
+          }
+        </div>
+      } @else {
+        <div class="spell-list" id="spell-results" role="tabpanel" [attr.aria-labelledby]="activeTab() + '-tab'">
+          @for (spell of filteredSpells(); track getSpellId(spell)) {
+            <article class="spell-card" [class.known]="isKnown(spell)" [class.prepared]="isPrepared(spell)">
+              <div class="spell-main">
+                <button
+                  class="spell-name"
+                  type="button"
+                  [attr.aria-expanded]="expandedSpellId() === getSpellId(spell)"
+                  (click)="toggleDetails(spell)"
+                >{{ spell.name }}</button>
+                <div class="spell-meta">
+                  @for (meta of getSpellMeta(spell); track meta) {
+                    <span>{{ meta }}</span>
+                  }
+                </div>
+                @if (spell['desc'] || spell['description']) {
+                  <p class="spell-preview">{{ getSpellText(spell['desc'] ?? spell['description']) }}</p>
+                }
+              </div>
+
+              <div class="spell-actions">
+                <label class="spell-toggle">
+                  <input type="checkbox" [checked]="isKnown(spell)" [disabled]="isSavingChanges()" (change)="toggleKnown(spell)">
+                  <span>Known</span>
+                </label>
+                <label class="spell-toggle" [class.disabled]="!isKnown(spell)">
+                  <input type="checkbox" [checked]="isPrepared(spell)" [disabled]="!isKnown(spell) || isSavingChanges()" (change)="togglePrepared(spell)">
+                  <span>Prepared</span>
+                </label>
+              </div>
+
+              @if (expandedSpellId() === getSpellId(spell)) {
+                <div class="spell-details">
+                  @if (spell['desc'] || spell['description']) {
+                    <p>{{ getSpellText(spell['desc'] ?? spell['description']) }}</p>
+                  }
+                  @for (field of [
+                    { key: 'higher_level', label: 'At higher levels' },
+                    { key: 'duration', label: 'Duration' },
+                    { key: 'components', label: 'Components' },
+                    { key: 'material', label: 'Materials' },
+                    { key: 'concentration', label: 'Concentration' },
+                    { key: 'ritual', label: 'Ritual' },
+                    { key: 'dnd_class', label: 'Classes' }
+                  ]; track field.key) {
+                    @if (getSpellText(spell[field.key]); as value) {
+                      <p><strong>{{ field.label }}:</strong> {{ value }}</p>
+                    }
+                  }
+                </div>
+              }
+            </article>
+          }
+        </div>
+      }
+    </section>
+  }
+</main>
